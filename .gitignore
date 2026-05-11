@@ -1,0 +1,17 @@
+# Never push the API token or database
+.env
+*.db
+
+# Never push the virtual environment
+venv/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Editor files
+.vscode/
+.idea/
