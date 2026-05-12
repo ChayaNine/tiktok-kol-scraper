@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TikTok KOL Intelligence Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #7c3aed;
+    --accent2: #06b6d4;
+    --accent3: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'Space Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(124,58,237,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,58,237,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Header */
+  header {
+    position: relative;
+    z-index: 10;
+    padding: 24px 40px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(10,10,15,0.8);
+    backdrop-filter: blur(12px);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  .logo-text {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .logo-sub {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--muted);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Main layout */
+  main {
+    position: relative;
+    z-index: 1;
+    padding: 32px 40px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  /* Section title */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Stat cards */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .stat-card:hover { border-color: var(--accent); }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+  }
+
+  .stat-card.cyan::before { background: linear-gradient(90deg, var(--accent2), transparent); }
+  .stat-card.amber::before { background: linear-gradient(90deg, var(--accent3), transparent); }
+  .stat-card.green::before { background: linear-gradient(90deg, var(--green), transparent); }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+  }
+
+  .stat-value {
+    font-family: var(--mono);
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .stat-sub {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* Charts row */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+  }
+
+  .chart-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: var(--text);
+  }
+
+  /* Bar chart */
+  .bar-chart { display: flex; flex-direction: column; gap: 10px; }
+
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .bar-label {
+    font-size: 11px;
+    color: var(--muted);
+    width: 60px;
+    flex-shrink: 0;
+    text-align: right;
+  }
+
+  .bar-track {
+    flex: 1;
+    height: 20px;
+    background: var(--surface2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    padding-left: 8px;
+    font-size: 10px;
+    font-family: var(--mono);
+    font-weight: 700;
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+    min-width: 30px;
+  }
+
+  /* Donut chart */
+  .donut-wrap {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .donut-svg { flex-shrink: 0; }
+
+  .donut-legend { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .legend-name { color: var(--muted); flex: 1; }
+  .legend-val { font-family: var(--mono); font-size: 11px; }
+
+  /* Table */
+  .table-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 32px;
+  }
+
+  .table-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .table-title { font-size: 14px; font-weight: 600; }
+
+  .table-count {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--surface2);
+    padding: 4px 10px;
+    border-radius: 100px;
+  }
+
+  .filters {
+    display: flex;
+    gap: 8px;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .filter-btn {
+    padding: 5px 14px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: var(--sans);
+  }
+
+  .filter-btn:hover, .filter-btn.active {
+    border-color: var(--accent);
+    color: var(--text);
+    background: rgba(124,58,237,0.1);
+  }
+
+  table { width: 100%; border-collapse: collapse; }
+
+  th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 14px 16px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(42,42,58,0.5);
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(124,58,237,0.03); }
+
+  .creator-name {
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .creator-handle {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 500;
+    font-family: var(--mono);
+  }
+
+  .badge-mega { background: rgba(245,158,11,0.15); color: var(--accent3); border: 1px solid rgba(245,158,11,0.3); }
+  .badge-mof  { background: rgba(124,58,237,0.15); color: #a78bfa; border: 1px solid rgba(124,58,237,0.3); }
+  .badge-micro { background: rgba(6,182,212,0.15); color: var(--accent2); border: 1px solid rgba(6,182,212,0.3); }
+  .badge-nano { background: rgba(100,116,139,0.15); color: var(--muted); border: 1px solid var(--border); }
+
+  .badge-kol  { background: rgba(16,185,129,0.15); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+  .badge-koc  { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+  .badge-creator { background: rgba(100,116,139,0.15); color: var(--muted); border: 1px solid var(--border); }
+
+  .badge-diy    { background: rgba(245,158,11,0.1); color: var(--accent3); }
+  .badge-garden { background: rgba(16,185,129,0.1); color: var(--green); }
+
+  .num {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  .num-muted {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .er-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .er-track {
+    width: 60px;
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .er-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+  }
+
+  /* Loading */
+  .loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px;
+    gap: 16px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Scrape panel */
+  .scrape-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .input-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 200px; }
+
+  .input-label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  input, select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+
+  input:focus, select:focus { border-color: var(--accent); }
+
+  .btn {
+    padding: 10px 24px;
+    border-radius: 8px;
+    border: none;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #6d28d9);
+    color: white;
+    box-shadow: 0 4px 12px rgba(124,58,237,0.3);
+  }
+
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(124,58,237,0.4); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+
+  .btn-ghost:hover { border-color: var(--accent); color: var(--text); }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 20px;
+    font-size: 13px;
+    z-index: 1000;
+    display: none;
+    animation: slideUp 0.3s ease;
+  }
+
+  .toast.show { display: block; }
+
+  @keyframes slideUp {
+    from { transform: translateY(10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .empty { text-align: center; padding: 60px; color: var(--muted); font-size: 13px; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .charts-row { grid-template-columns: 1fr; }
+    main { padding: 20px; }
+    header { padding: 16px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📊</div>
+    <div>
+      <div class="logo-text">KOL Intelligence</div>
+      <div class="logo-sub">TikTok Creator Analytics · Thailand</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill">
+      <div class="status-dot"></div>
+      <span id="apiStatus">Connecting...</span>
+    </div>
+    <button class="btn btn-ghost" onclick="loadAll()">↻ Refresh</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- Scrape Trigger -->
+  <div class="section-label">⚡ Trigger Scrape</div>
+  <div class="scrape-panel">
+    <div class="input-group">
+      <label class="input-label">Hashtags (comma separated)</label>
+      <input type="text" id="hashtagInput" placeholder="ทำสวน, ซ่อมบ้านเอง, DIYง่ายๆ" value="ทำสวน, ซ่อมบ้านเอง">
+    </div>
+    <div class="input-group" style="max-width:160px">
+      <label class="input-label">Max Profiles</label>
+      <select id="maxProfiles">
+        <option value="5">5 profiles</option>
+        <option value="10" selected>10 profiles</option>
+        <option value="20">20 profiles</option>
+        <option value="50">50 profiles</option>
+      </select>
+    </div>
+    <div class="input-group" style="max-width:120px">
+      <label class="input-label">Depth</label>
+      <select id="depthSelect">
+        <option value="0" selected>0 (direct)</option>
+        <option value="1">1 (related)</option>
+        <option value="2">2 (deep)</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" id="scrapeBtn" onclick="triggerScrape()">▶ Run Scrape</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="section-label">📈 Overview</div>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Creators</div>
+      <div class="stat-value" id="totalCreators">—</div>
+      <div class="stat-sub">Unique TikTok profiles</div>
+    </div>
+    <div class="stat-card cyan">
+      <div class="stat-label">Hashtags Scraped</div>
+      <div class="stat-value" id="totalHashtags">—</div>
+      <div class="stat-sub">Completed successfully</div>
+    </div>
+    <div class="stat-card amber">
+      <div class="stat-label">Avg Engagement</div>
+      <div class="stat-value" id="avgER">—</div>
+      <div class="stat-sub">Across all creators</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">KOL Identified</div>
+      <div class="stat-value" id="totalKOL">—</div>
+      <div class="stat-sub">High-trust creators</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="section-label">🎯 Breakdown</div>
+  <div class="charts-row">
+
+    <div class="chart-card">
+      <div class="chart-title">Influencer Size</div>
+      <div class="bar-chart" id="sizeChart">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Creator Type</div>
+      <div class="donut-wrap" id="typeChart">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Category</div>
+      <div class="bar-chart" id="catChart">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Creator Table -->
+  <div class="section-label">👥 Creator Database</div>
+  <div class="table-card">
+    <div class="table-header">
+      <span class="table-title">All Creators</span>
+      <span class="table-count" id="tableCount">Loading...</span>
+    </div>
+    <div class="filters">
+      <button class="filter-btn active" onclick="filterTable('all', this)">All</button>
+      <button class="filter-btn" onclick="filterTable('Mega', this)">Mega</button>
+      <button class="filter-btn" onclick="filterTable('MOF', this)">MOF</button>
+      <button class="filter-btn" onclick="filterTable('Micro', this)">Micro</button>
+      <button class="filter-btn" onclick="filterTable('Nano', this)">Nano</button>
+      <button class="filter-btn" onclick="filterTable('KOL', this)">KOL</button>
+      <button class="filter-btn" onclick="filterTable('KOC', this)">KOC</button>
+      <button class="filter-btn" onclick="filterTable('DIY', this)">DIY</button>
+      <button class="filter-btn" onclick="filterTable('Garden', this)">Garden</button>
+    </div>
+    <div id="tableWrap">
+      <div class="loading"><div class="spinner"></div><span>Fetching creators...</span></div>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'http://127.0.0.1:8000';
+let allCreators = [];
+let currentFilter = 'all';
+
+function showToast(msg, duration = 3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+function fmt(n) {
+  if (n === null || n === undefined) return '—';
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n/1000).toFixed(1) + 'K';
+  return n.toLocaleString();
+}
+
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/health`);
+    const d = await r.json();
+    document.getElementById('apiStatus').textContent = 'API Connected';
+    document.querySelector('.status-dot').style.background = '#10b981';
+  } catch(e) {
+    document.getElementById('apiStatus').textContent = 'API Offline';
+    document.querySelector('.status-dot').style.background = '#ef4444';
+  }
+}
+
+async function loadCreators() {
+  try {
+    const r = await fetch(`${API}/creators?limit=500`);
+    allCreators = await r.json();
+    renderStats();
+    renderCharts();
+    renderTable(allCreators);
+    document.getElementById('tableCount').textContent = allCreators.length + ' creators';
+  } catch(e) {
+    document.getElementById('tableWrap').innerHTML = '<div class="empty">Could not load creators. Is the API running?</div>';
+  }
+}
+
+async function loadHashtags() {
+  try {
+    const r = await fetch(`${API}/hashtags?status=done&limit=500`);
+    const d = await r.json();
+    document.getElementById('totalHashtags').textContent = d.length;
+  } catch(e) {}
+}
+
+function renderStats() {
+  document.getElementById('totalCreators').textContent = allCreators.length;
+
+  const kols = allCreators.filter(c => c.creator_type === 'KOL').length;
+  document.getElementById('totalKOL').textContent = kols;
+
+  const ers = allCreators.filter(c => c.engagement_rate).map(c => c.engagement_rate);
+  const avgER = ers.length ? (ers.reduce((a,b) => a+b, 0) / ers.length).toFixed(2) + '%' : '—';
+  document.getElementById('avgER').textContent = avgER;
+}
+
+function renderCharts() {
+  // Size breakdown
+  const sizes = {Mega:0, MOF:0, Micro:0, Nano:0, Unknown:0};
+  allCreators.forEach(c => { sizes[c.influencer_size || 'Unknown']++; });
+  const sizeColors = {Mega:'#f59e0b', MOF:'#a78bfa', Micro:'#06b6d4', Nano:'#64748b', Unknown:'#374151'};
+  const total = allCreators.length || 1;
+
+  document.getElementById('sizeChart').innerHTML = Object.entries(sizes)
+    .filter(([k]) => k !== 'Unknown')
+    .map(([k,v]) => `
+      <div class="bar-row">
+        <div class="bar-label">${k}</div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${Math.max(v/total*100,2)}%;background:${sizeColors[k]};color:#000">
+            ${v}
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+  // Type donut
+  const types = {KOL:0, KOC:0, Creator:0, Unknown:0};
+  allCreators.forEach(c => { types[c.creator_type || 'Unknown']++; });
+  const typeColors = ['#10b981','#ef4444','#64748b','#374151'];
+  const typeKeys = ['KOL','KOC','Creator','Unknown'];
+  const typeTotal = allCreators.length || 1;
+
+  let offset = 0;
+  const segments = typeKeys.map((k, i) => {
+    const pct = types[k] / typeTotal * 100;
+    const seg = `<circle cx="60" cy="60" r="45" fill="none" stroke="${typeColors[i]}" stroke-width="18"
+      stroke-dasharray="${pct * 2.827} ${282.7 - pct * 2.827}"
+      stroke-dashoffset="${-offset * 2.827 + 70.7}"
+      transform="rotate(-90 60 60)"/>`;
+    offset += pct;
+    return seg;
+  }).join('');
+
+  document.getElementById('typeChart').innerHTML = `
+    <svg class="donut-svg" width="120" height="120" viewBox="0 0 120 120">
+      <circle cx="60" cy="60" r="45" fill="none" stroke="#1a1a24" stroke-width="18"/>
+      ${segments}
+    </svg>
+    <div class="donut-legend">
+      ${typeKeys.map((k,i) => `
+        <div class="legend-item">
+          <div class="legend-dot" style="background:${typeColors[i]}"></div>
+          <span class="legend-name">${k}</span>
+          <span class="legend-val">${types[k]}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  // Category
+  const cats = {DIY:0, Garden:0, Unknown:0};
+  allCreators.forEach(c => { cats[c.category_target || 'Unknown']++; });
+  const catColors = {DIY:'#f59e0b', Garden:'#10b981', Unknown:'#374151'};
+
+  document.getElementById('catChart').innerHTML = Object.entries(cats).map(([k,v]) => `
+    <div class="bar-row">
+      <div class="bar-label">${k}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${Math.max(v/total*100,2)}%;background:${catColors[k]};color:#000">
+          ${v}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function sizeBadge(s) {
+  const map = {Mega:'badge-mega', MOF:'badge-mof', Micro:'badge-micro', Nano:'badge-nano'};
+  return `<span class="badge ${map[s]||'badge-nano'}">${s||'—'}</span>`;
+}
+
+function typeBadge(t) {
+  const map = {KOL:'badge-kol', KOC:'badge-koc', Creator:'badge-creator'};
+  return `<span class="badge ${map[t]||'badge-creator'}">${t||'—'}</span>`;
+}
+
+function catBadge(c) {
+  if (c === 'DIY') return `<span class="badge badge-diy">🔧 DIY</span>`;
+  if (c === 'Garden') return `<span class="badge badge-garden">🌿 Garden</span>`;
+  return `<span style="color:var(--muted);font-size:12px">—</span>`;
+}
+
+function renderTable(creators) {
+  if (!creators.length) {
+    document.getElementById('tableWrap').innerHTML = '<div class="empty">No creators found for this filter.</div>';
+    return;
+  }
+
+  const rows = creators.slice(0, 200).map(c => {
+    const er = c.engagement_rate ? c.engagement_rate.toFixed(2) : null;
+    const erPct = er ? Math.min(er / 20 * 100, 100) : 0;
+    return `
+      <tr>
+        <td>
+          <div class="creator-name">${c.display_name || c.username}</div>
+          <div class="creator-handle">@${c.username}</div>
+        </td>
+        <td><span class="num">${fmt(c.followers)}</span></td>
+        <td>${sizeBadge(c.influencer_size)}</td>
+        <td>${typeBadge(c.creator_type)}</td>
+        <td>${catBadge(c.category_target)}</td>
+        <td><span class="num-muted">${fmt(c.avg_view)}</span></td>
+        <td>
+          ${er ? `
+            <div class="er-bar">
+              <div class="er-track"><div class="er-fill" style="width:${erPct}%"></div></div>
+              <span class="num" style="font-size:11px">${er}%</span>
+            </div>
+          ` : '<span style="color:var(--muted)">—</span>'}
+        </td>
+        <td>
+          <a href="${c.profile_url}" target="_blank"
+             style="color:var(--accent2);font-size:12px;text-decoration:none;font-family:var(--mono)">
+            ↗ TikTok
+          </a>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  document.getElementById('tableWrap').innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Creator</th>
+          <th>Followers</th>
+          <th>Size</th>
+          <th>Type</th>
+          <th>Category</th>
+          <th>Avg Views</th>
+          <th>Eng. Rate</th>
+          <th>Profile</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function filterTable(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  let filtered = allCreators;
+  if (filter !== 'all') {
+    filtered = allCreators.filter(c =>
+      c.influencer_size === filter ||
+      c.creator_type === filter ||
+      c.category_target === filter
+    );
+  }
+  renderTable(filtered);
+  document.getElementById('tableCount').textContent = filtered.length + ' creators';
+}
+
+async function triggerScrape() {
+  const btn = document.getElementById('scrapeBtn');
+  const raw = document.getElementById('hashtagInput').value;
+  const hashtags = raw.split(',').map(h => h.trim()).filter(Boolean);
+  const max = parseInt(document.getElementById('maxProfiles').value);
+  const depth = parseInt(document.getElementById('depthSelect').value);
+
+  if (!hashtags.length) { showToast('Enter at least one hashtag'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Running...';
+  showToast(`Scraping ${hashtags.length} hashtag(s)... this may take a few minutes`, 60000);
+
+  try {
+    const r = await fetch(`${API}/scrape`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ hashtags, max_profiles_per_query: max, depth })
+    });
+    const d = await r.json();
+    const saved = d.summaries?.reduce((a, s) => a + (s.creators_saved || 0), 0) || 0;
+    showToast(`✅ Done! ${saved} creators saved.`);
+    await loadAll();
+  } catch(e) {
+    showToast('❌ Error: ' + e.message);
+  }
+
+  btn.disabled = false;
+  btn.textContent = '▶ Run Scrape';
+}
+
+async function loadAll() {
+  await checkHealth();
+  await Promise.all([loadCreators(), loadHashtags()]);
+}
+
+loadAll();
+</script>
+</body>
+</html>

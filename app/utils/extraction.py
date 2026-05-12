@@ -1,40 +1,24 @@
-"""
-Extraction and normalization utilities.
-
-Apify actor GdWCkxBtKWOsKjdch returns items that can be either:
-  - A video item  (has authorMeta, videoMeta, etc.)
-  - A profile/user item (has userInfo / profileData etc.)
-
-We normalise everything here so the rest of the app does not care
-about the raw Apify shape.
-"""
-
 import re
 from datetime import datetime, timezone
 from typing import Optional
 from collections import defaultdict
 
 
-# ── Hashtag normalisation ────────────────────────────────────────────────────
-
 def normalize_hashtag(tag: str) -> str:
-    """Remove leading #, strip spaces, lowercase."""
     return tag.lstrip("#").strip().lower()
 
 
-def extract_hashtags_from_text(text: Optional[str]) -> list[str]:
-    """Pull all #hashtags from any text string."""
+def extract_hashtags_from_text(text: Optional[str]) -> list:
     if not text:
         return []
     raw = re.findall(r"#([\w\u0E00-\u0E7F]+)", text)
     return [normalize_hashtag(t) for t in raw if t]
 
 
-# ── Author / profile extraction ──────────────────────────────────────────────
-
 def _safe_int(value) -> Optional[int]:
     try:
-        return int(value)
+        v = int(value)
+        return v
     except (TypeError, ValueError):
         return None
 
@@ -48,110 +32,67 @@ def _safe_float(value) -> Optional[float]:
 
 def extract_author_from_item(item: dict) -> Optional[dict]:
     """
-    Given one Apify item, return a normalised author dict or None.
-
-    Apify can return:
-      item["authorMeta"]  — nested author object inside a video item
-      item["author"]      — flat author object
-      item["userInfo"]    — profile scrape item
+    Raw JSON from this Apify actor has authorMeta with these fields:
+      name, nickName, fans, following, heart, signature, profileUrl
     """
-    author = (
-        item.get("authorMeta")
-        or item.get("author")
-        or item.get("userInfo", {}).get("user")
-        or item.get("userInfo")
-        or None
-    )
+    author = item.get("authorMeta") or item.get("author") or {}
 
-    if author is None:
+    if not author:
         return None
 
-    # Flatten: different Apify versions use different keys
     username = (
-        author.get("uniqueId")
-        or author.get("name")
+        author.get("name")
+        or author.get("uniqueId")
         or author.get("username")
-        or author.get("id")            # fallback — not ideal but better than None
     )
 
     if not username:
         return None
 
-    stats = (
-        author.get("stats")
-        or author.get("authorStats")
-        or item.get("authorStats")
-        or {}
-    )
+    # fans = followers in Apify's naming
+    followers_raw = author.get("fans")
+    followers = _safe_int(followers_raw) if followers_raw is not None else None
 
-    followers = _safe_int(
-        author.get("fans")
-        or author.get("followers")
-        or author.get("followerCount")
-        or stats.get("followerCount")
-        or stats.get("fans")
-    )
+    following_raw = author.get("following")
+    following = _safe_int(following_raw) if following_raw is not None else None
 
-    following = _safe_int(
-        author.get("following")
-        or author.get("followingCount")
-        or stats.get("followingCount")
-    )
-
-    total_likes = _safe_int(
-        author.get("heart")
-        or author.get("heartCount")
-        or author.get("digg")
-        or stats.get("heartCount")
-        or stats.get("diggCount")
-    )
+    heart_raw = author.get("heart")
+    total_likes = _safe_int(heart_raw) if heart_raw is not None else None
 
     return {
         "username":     str(username).lower().strip(),
-        "display_name": author.get("nickName") or author.get("nickname") or author.get("name"),
+        "display_name": author.get("nickName") or author.get("nickname"),
         "followers":    followers,
         "following":    following,
         "total_likes":  total_likes,
         "bio":          author.get("signature") or author.get("bio"),
-        "profile_url":  f"https://www.tiktok.com/@{username}",
+        "profile_url":  author.get("profileUrl") or f"https://www.tiktok.com/@{username}",
     }
 
 
-# ── Video/post metrics ───────────────────────────────────────────────────────
-
 def extract_video_metrics(item: dict) -> Optional[dict]:
     """
-    Extract per-video stats from an Apify video item.
-    Returns None if the item does not look like a video.
+    In this Apify actor, video stats are at the TOP LEVEL of the item:
+      diggCount, playCount, commentCount, shareCount
+    NOT inside a nested stats object.
     """
-    # Check it has some video-like stats
-    stats = (
-        item.get("statsV2")
-        or item.get("stats")
-        or {}
-    )
-
-    plays    = _safe_int(stats.get("playCount")    or stats.get("plays"))
-    likes    = _safe_int(stats.get("diggCount")    or stats.get("likes"))
-    comments = _safe_int(stats.get("commentCount") or stats.get("comments"))
-    shares   = _safe_int(stats.get("shareCount")   or stats.get("shares"))
+    plays    = _safe_int(item.get("playCount"))
+    likes    = _safe_int(item.get("diggCount"))
+    comments = _safe_int(item.get("commentCount"))
+    shares   = _safe_int(item.get("shareCount"))
 
     if plays is None and likes is None:
         return None
 
-    # Create time — Apify usually gives a Unix timestamp
-    created_ts = item.get("createTime") or item.get("createTimeISO")
+    created_ts = item.get("createTime")
     created_dt = None
     if created_ts:
         try:
             created_dt = datetime.fromtimestamp(int(created_ts), tz=timezone.utc)
-        except (TypeError, ValueError, OSError):
-            try:
-                created_dt = datetime.fromisoformat(str(created_ts))
-            except Exception:
-                pass
+        except Exception:
+            pass
 
-    description = item.get("desc") or item.get("text") or item.get("description") or ""
+    description = item.get("text") or item.get("desc") or ""
 
     return {
         "plays":       plays,
@@ -163,13 +104,7 @@ def extract_video_metrics(item: dict) -> Optional[dict]:
     }
 
 
-# ── Aggregate metrics from multiple videos ───────────────────────────────────
-
-def calculate_creator_metrics(video_metrics: list[dict]) -> dict:
-    """
-    Given a list of extract_video_metrics() results for one creator,
-    return aggregated numbers.
-    """
+def calculate_creator_metrics(video_metrics: list) -> dict:
     if not video_metrics:
         return {}
 
@@ -181,12 +116,10 @@ def calculate_creator_metrics(video_metrics: list[dict]) -> dict:
     avg_like    = sum(likes)    / len(likes)    if likes    else None
     avg_comment = sum(comments) / len(comments) if comments else None
 
-    # Engagement rate = (avg_like + avg_comment) / avg_view  × 100
     engagement_rate = None
     if avg_like is not None and avg_comment is not None and avg_view:
         engagement_rate = round((avg_like + avg_comment) / avg_view * 100, 2)
 
-    # Videos per month — needs at least 2 videos with timestamps
     videos_per_month = None
     dates = sorted(
         [v["created_at"] for v in video_metrics if v.get("created_at") is not None]
@@ -197,52 +130,32 @@ def calculate_creator_metrics(video_metrics: list[dict]) -> dict:
             videos_per_month = round(len(dates) / (span_days / 30), 2)
 
     return {
-        "avg_view":        round(avg_view, 2)    if avg_view    is not None else None,
-        "avg_like":        round(avg_like, 2)    if avg_like    is not None else None,
-        "avg_comment":     round(avg_comment, 2) if avg_comment is not None else None,
-        "engagement_rate": engagement_rate,
+        "avg_view":         round(avg_view, 2)    if avg_view    is not None else None,
+        "avg_like":         round(avg_like, 2)    if avg_like    is not None else None,
+        "avg_comment":      round(avg_comment, 2) if avg_comment is not None else None,
+        "engagement_rate":  engagement_rate,
         "videos_per_month": videos_per_month,
     }
 
 
-# ── Hashtag discovery from a batch of items ─────────────────────────────────
-
-def discover_hashtags_from_items(items: list[dict]) -> list[str]:
-    """
-    Walk every item, pull hashtags from descriptions, challenges, etc.
-    Returns a deduplicated list of normalised hashtags.
-    """
-    found: set[str] = set()
-
+def discover_hashtags_from_items(items: list) -> list:
+    found = set()
     for item in items:
-        # From challenges / hashtag objects on the video
-        for challenge in item.get("challenges", []) or []:
-            title = challenge.get("title") or challenge.get("name") or ""
-            if title:
-                found.add(normalize_hashtag(title))
-
-        # From text/description
-        desc = item.get("desc") or item.get("text") or item.get("description") or ""
+        for ht in item.get("hashtags", []) or []:
+            name = ht.get("name") or ht.get("title") or ""
+            if name:
+                found.add(normalize_hashtag(name))
+        desc = item.get("text") or item.get("desc") or ""
         found.update(extract_hashtags_from_text(desc))
-
-        # From textExtra (TikTok API sometimes includes this)
         for extra in item.get("textExtra", []) or []:
             ht = extra.get("hashtagName") or extra.get("title") or ""
             if ht:
                 found.add(normalize_hashtag(ht))
-
-    # Remove empty strings
     return [h for h in found if h]
 
 
-# ── Group items by author ────────────────────────────────────────────────────
-
-def group_items_by_author(items: list[dict]) -> dict[str, list[dict]]:
-    """
-    Return { username: [item, item, ...] }
-    Only includes items that have a recognisable author.
-    """
-    grouped: dict[str, list[dict]] = defaultdict(list)
+def group_items_by_author(items: list) -> dict:
+    grouped = defaultdict(list)
     for item in items:
         author = extract_author_from_item(item)
         if author and author.get("username"):
